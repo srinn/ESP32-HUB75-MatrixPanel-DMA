@@ -393,12 +393,7 @@ void IRAM_ATTR MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint16_t x_coord, uint
     --colour_depth_idx;
 
     // Get the contents at this address with bounds checking
-    if (y_coord >= fb->rowBits.size()) {
-      return;  // Safety check
-    }
-    
-    ESP32_I2S_DMA_STORAGE_TYPE *p = getRowDataPtr(y_coord, colour_depth_idx);
-    if (!p) {
+    if (y_coord >= fb->rowBits.size() || !fb->rowBits[y_coord]) {
       return;  // Safety check
     }
 
@@ -421,6 +416,7 @@ void IRAM_ATTR MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint16_t x_coord, uint
     // Get the contents at this address,
     // it would represent a vector pointing to the full row of pixels for the specified colour depth bit at Y coordinate
     ESP32_I2S_DMA_STORAGE_TYPE *p = getRowDataPtr(y_coord, colour_depth_idx);
+  
 
     // We need to update the correct uint16_t word in the rowBitStruct array pointing to a specific pixel at X - coordinate
     p[x_coord] &= _colourbitclear; // reset RGB bits
@@ -1008,10 +1004,3 @@ void MatrixPanel_I2S_DMA::fillRectDMA(int16_t x, int16_t y, int16_t w, int16_t h
 }
 
 #endif // NO_FAST_FUNCTIONS
-
-inline ESP32_I2S_DMA_STORAGE_TYPE* getRowDataPtr(uint16_t row, uint8_t _dpth) {
-    if (row >= fb->rowBits.size() || !fb->rowBits[row]) {
-        return nullptr;
-    }
-    return fb->rowBits[row]->getDataPtr(_dpth);
-}
