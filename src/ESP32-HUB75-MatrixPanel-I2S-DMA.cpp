@@ -47,11 +47,14 @@ bool MatrixPanel_I2S_DMA::setupDMA(const HUB75_I2S_CFG &_cfg)
 
   int fbs_required = (m_cfg.double_buff) ? 2 : 1;
 
+  // Calculate the number of rows we need to allocate
+  int rows_to_allocate = m_cfg.single_scan ? m_cfg.mx_height : ROWS_PER_FRAME;
+
   for (int fb = 0; fb < (fbs_required); fb++)
   {
-    frame_buffer[fb].rowBits.reserve(ROWS_PER_FRAME);
+    frame_buffer[fb].rowBits.reserve(rows_to_allocate);  // Use full height for single scan
 
-    for (int malloc_num = 0; malloc_num < ROWS_PER_FRAME; malloc_num++)
+    for (int malloc_num = 0; malloc_num < rows_to_allocate; malloc_num++)  // Allocate for full height
     {
       auto ptr = std::make_shared<rowBitStruct>(PIXELS_PER_ROW, m_cfg.getPixelColorDepthBits());
 
@@ -388,6 +391,16 @@ void IRAM_ATTR MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint16_t x_coord, uint
   do
   {
     --colour_depth_idx;
+
+    // Get the contents at this address with bounds checking
+    if (y_coord >= fb->rowBits.size()) {
+      return;  // Safety check
+    }
+    
+    ESP32_I2S_DMA_STORAGE_TYPE *p = getRowDataPtr(y_coord, colour_depth_idx);
+    if (!p) {
+      return;  // Safety check
+    }
 
 #ifdef NO_CIE1931
     uint16_t mask = colour_depth_idx;
@@ -995,3 +1008,10 @@ void MatrixPanel_I2S_DMA::fillRectDMA(int16_t x, int16_t y, int16_t w, int16_t h
 }
 
 #endif // NO_FAST_FUNCTIONS
+
+inline ESP32_I2S_DMA_STORAGE_TYPE* getRowDataPtr(uint16_t row, uint8_t _dpth) {
+    if (row >= fb->rowBits.size() || !fb->rowBits[row]) {
+        return nullptr;
+    }
+    return fb->rowBits[row]->getDataPtr(_dpth);
+}
