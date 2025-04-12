@@ -374,11 +374,12 @@ void IRAM_ATTR MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint16_t x_coord, uint
 
   uint16_t _colourbitclear = BITMASK_RGB1_CLEAR, _colourbitoffset = 0;
 
-  if (y_coord >= ROWS_PER_FRAME)
-  { // if we are drawing to the bottom part of the panel
-    _colourbitoffset = BITS_RGB2_OFFSET;
-    _colourbitclear = BITMASK_RGB2_CLEAR;
-    y_coord -= ROWS_PER_FRAME;
+  if (!m_cfg.single_scan) {
+    if (y_coord >= ROWS_PER_FRAME) {
+      _colourbitoffset = BITS_RGB2_OFFSET;
+      _colourbitclear = BITMASK_RGB2_CLEAR;
+      y_coord -= ROWS_PER_FRAME;
+    }
   }
 
   // Iterating through colour depth bits, which we assume are 8 bits per RGB subpixel (24bpp)

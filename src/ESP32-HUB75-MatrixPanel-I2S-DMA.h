@@ -300,6 +300,8 @@ struct HUB75_I2S_CFG
   // use DMA double buffer (twice as much RAM required)
   bool double_buff;
 
+  bool single_scan;
+
   // I2S clock speed
   clk_speed i2sspeed;
 
@@ -337,12 +339,13 @@ struct HUB75_I2S_CFG
           LAT_PIN_DEFAULT, OE_PIN_DEFAULT, CLK_PIN_DEFAULT},
       shift_driver _drv = SHIFTREG, 
       bool _dbuff = false, 
+      bool _single_scan = false,
       clk_speed _i2sspeed = HZ_8M,
       uint8_t _latblk = DEFAULT_LAT_BLANKING, // Anything > 1 seems to cause artefacts on ICS panels
       bool _clockphase = true, 
       uint16_t _min_refresh_rate = 60, 
       uint8_t _pixel_color_depth_bits = PIXEL_COLOR_DEPTH_BITS_DEFAULT) 
-      : mx_width(_w), mx_height(_h), chain_length(_chain), gpio(_pinmap), driver(_drv), double_buff(_dbuff), i2sspeed(_i2sspeed), latch_blanking(_latblk), clkphase(_clockphase), min_refresh_rate(_min_refresh_rate)
+      : mx_width(_w), mx_height(_h), chain_length(_chain), gpio(_pinmap), driver(_drv), double_buff(_dbuff), single_scan(_single_scan), i2sspeed(_i2sspeed), latch_blanking(_latblk), clkphase(_clockphase), min_refresh_rate(_min_refresh_rate)
   {
     setPixelColorDepthBits(_pixel_color_depth_bits);
   }
