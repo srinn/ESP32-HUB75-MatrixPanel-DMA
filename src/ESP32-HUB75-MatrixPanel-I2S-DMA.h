@@ -300,8 +300,6 @@ struct HUB75_I2S_CFG
   // use DMA double buffer (twice as much RAM required)
   bool double_buff;
 
-  bool single_scan;
-
   // I2S clock speed
   clk_speed i2sspeed;
 
