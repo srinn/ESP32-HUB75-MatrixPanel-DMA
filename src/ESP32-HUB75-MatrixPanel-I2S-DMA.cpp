@@ -3,6 +3,7 @@
 #if defined(SPIRAM_DMA_BUFFER)
 // Sprite_TM saves the day again...
 // https://www.esp32.com/viewtopic.php?f=2&t=30584
+#include "esp_cache.h"
 #include "rom/cache.h"
 #endif
 
@@ -700,7 +701,7 @@ void MatrixPanel_I2S_DMA::setBrightnessOE(uint8_t brt, const int _buff_id)
 	// data changes probably aren't being sent out via DMA as they're sitting in a hadrware 'cache' 
     ESP32_I2S_DMA_STORAGE_TYPE *row_ptr = fb->rowBits[row_idx]->getDataPtr(0);
     // Cache_WriteBack_Addr((uint32_t)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false));
-    esp_cache_msync( (void*)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false)), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
+    esp_cache_msync( (void*)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
 #endif
   } while (row_idx);
 }
