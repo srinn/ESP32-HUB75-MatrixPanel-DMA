@@ -183,15 +183,19 @@ struct rowBitStruct
 
   // constructor - allocates DMA-capable memory to hold the struct data
   //rowBitStruct(const size_t _width, const uint8_t _depth, const bool _dbuff) : width(_width), colour_depth(_depth), double_buff(_dbuff)
-  rowBitStruct(const size_t _width, const uint8_t _depth) : width(_width), colour_depth(_depth)
+  // rowBitStruct(const size_t _width, const uint8_t _depth) : width(_width), colour_depth(_depth)
+  rowBitStruct(const size_t _width, const uint8_t _depth, bool _sram_buffer = false) : width(_width), colour_depth(_depth)
   {
 
     // #if defined(SPIRAM_FRAMEBUFFER) && defined (CONFIG_IDF_TARGET_ESP32S3)
 #if defined(SPIRAM_DMA_BUFFER)
-
-    // data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_aligned_alloc(64, size()+size()*double_buff, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    // No longer have double buffer in the same struct - have a different struct
-    data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_aligned_alloc(64, getColorDepthSize(false), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (_sram_buffer) {
+      data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_malloc(getColorDepthSize(false), MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+    } else {
+      // data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_aligned_alloc(64, size()+size()*double_buff, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+      // No longer have double buffer in the same struct - have a different struct
+      data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_aligned_alloc(64, getColorDepthSize(false), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT | MALLOC_CAP_DMA );
+    }
 #else
     // data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_malloc( size()+size()*double_buff, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
 
@@ -300,6 +304,14 @@ struct HUB75_I2S_CFG
   // use DMA double buffer (twice as much RAM required)
   bool double_buff;
 
+  // use SRAM instead of PSRAM (if available)
+  bool sram_buffer;
+
+  // Region of Interest (ROI) for memory optimization
+  // If max_row > min_row, only rows in [min_row, max_row] are allocated full depth.
+  uint8_t min_row;
+  uint8_t max_row;
+
   // I2S clock speed
   clk_speed i2sspeed;
 
@@ -341,8 +353,11 @@ struct HUB75_I2S_CFG
       uint8_t _latblk = DEFAULT_LAT_BLANKING, // Anything > 1 seems to cause artefacts on ICS panels
       bool _clockphase = true, 
       uint16_t _min_refresh_rate = 60, 
-      uint8_t _pixel_color_depth_bits = PIXEL_COLOR_DEPTH_BITS_DEFAULT) 
-      : mx_width(_w), mx_height(_h), chain_length(_chain), gpio(_pinmap), driver(_drv), double_buff(_dbuff), i2sspeed(_i2sspeed), latch_blanking(_latblk), clkphase(_clockphase), min_refresh_rate(_min_refresh_rate)
+      uint8_t _pixel_color_depth_bits = PIXEL_COLOR_DEPTH_BITS_DEFAULT,
+      bool _sram_buffer = false,
+      uint8_t _min_row = 0,
+      uint8_t _max_row = 0) 
+      : mx_width(_w), mx_height(_h), chain_length(_chain), gpio(_pinmap), driver(_drv), double_buff(_dbuff), i2sspeed(_i2sspeed), latch_blanking(_latblk), clkphase(_clockphase), min_refresh_rate(_min_refresh_rate), sram_buffer(_sram_buffer), min_row(_min_row), max_row(_max_row)
   {
     setPixelColorDepthBits(_pixel_color_depth_bits);
   }

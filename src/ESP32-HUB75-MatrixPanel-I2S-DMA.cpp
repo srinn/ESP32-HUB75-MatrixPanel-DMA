@@ -54,7 +54,16 @@ bool MatrixPanel_I2S_DMA::setupDMA(const HUB75_I2S_CFG &_cfg)
 
     for (int malloc_num = 0; malloc_num < ROWS_PER_FRAME; malloc_num++)
     {
-      auto ptr = std::make_shared<rowBitStruct>(PIXELS_PER_ROW, m_cfg.getPixelColorDepthBits());
+      int depth = m_cfg.getPixelColorDepthBits();
+      
+      // If ROI is specified, only use full color depth for rows within the ROI
+      if (m_cfg.max_row > m_cfg.min_row) {
+        if (malloc_num < m_cfg.min_row || malloc_num > m_cfg.max_row) {
+           depth = 1; // Dummy row
+        }
+      }
+
+      auto ptr = std::make_shared<rowBitStruct>(PIXELS_PER_ROW, depth, m_cfg.sram_buffer);
 
       if (ptr->data == nullptr) {
 
@@ -336,6 +345,12 @@ void IRAM_ATTR MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint16_t x_coord, uint
   if (!initialized)
     return;
 
+  if (m_cfg.max_row > m_cfg.min_row) {
+    if ((y_coord % ROWS_PER_FRAME) < m_cfg.min_row || (y_coord % ROWS_PER_FRAME) > m_cfg.max_row) {
+      return;
+    }
+  }
+
   /* 1) Check that the co-ordinates are within range, or it'll break everything big time.
    * Valid co-ordinates are from 0 to (MATRIX_XXXX-1)
    */
@@ -515,8 +530,10 @@ void MatrixPanel_I2S_DMA::clearFrameBuffer(bool _buff_id)
     ESP32_I2S_DMA_STORAGE_TYPE *row = fb->rowBits[row_idx]->getDataPtr(0); // set pointer to the HEAD of a buffer holding data for the entire matrix row
     ESP32_I2S_DMA_STORAGE_TYPE abcde = (ESP32_I2S_DMA_STORAGE_TYPE)row_idx;
 
+    uint8_t row_depth = fb->rowBits[row_idx]->colour_depth;
+
     // get last pixel index in a row of all colourdepths
-    int x_pixel = fb->rowBits[row_idx]->width * fb->rowBits[row_idx]->colour_depth;
+    int x_pixel = fb->rowBits[row_idx]->width * row_depth;
 
 	abcde <<= BITS_ADDR_OFFSET; // shift row y-coord to match ABCDE bits in vector from 8 to 12
 	do
@@ -656,6 +673,8 @@ void MatrixPanel_I2S_DMA::setBrightnessOE(uint8_t brt, const int _buff_id)
   do
   {
     --row_idx;
+
+    uint8_t _depth = fb->rowBits[row_idx]->colour_depth;
 
     // let's set OE control bits for specific pixels in each color_index subrows
     uint8_t colouridx = _depth;
