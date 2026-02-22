@@ -3,7 +3,10 @@
 #if defined(SPIRAM_DMA_BUFFER)
 // Sprite_TM saves the day again...
 // https://www.esp32.com/viewtopic.php?f=2&t=30584
+#include "esp_idf_version.h"
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #include "esp_cache.h"
+#endif
 #include "rom/cache.h"
 #endif
 
@@ -429,7 +432,11 @@ void IRAM_ATTR MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint16_t x_coord, uint
 
 #if defined(SPIRAM_DMA_BUFFER)
     // Cache_WriteBack_Addr((uint32_t)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE));
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     esp_cache_msync( (void*)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
+#else
+    Cache_WriteBack_Addr((uint32_t)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE));
+#endif
 #endif
 
   } while (colour_depth_idx); // end of colour depth loop (8)
@@ -497,7 +504,11 @@ void MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint8_t red, uint8_t green, uint
 
 #if defined(SPIRAM_DMA_BUFFER)
         // Cache_WriteBack_Addr((uint32_t)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE));
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
         esp_cache_msync( (void*)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
+#else
+        Cache_WriteBack_Addr((uint32_t)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE));
+#endif
 #endif
 
       } while (x_coord);
@@ -650,7 +661,11 @@ void MatrixPanel_I2S_DMA::clearFrameBuffer(bool _buff_id)
 
 #if defined(SPIRAM_DMA_BUFFER)
     // Cache_WriteBack_Addr((uint32_t)row, fb->rowBits[row_idx]->getColorDepthSize(false));
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     esp_cache_msync( (void*)row, fb->rowBits[row_idx]->getColorDepthSize(false), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
+#else
+    Cache_WriteBack_Addr((uint32_t)row, fb->rowBits[row_idx]->getColorDepthSize(false));
+#endif
 #endif
 
   } while (row_idx);
@@ -720,7 +735,11 @@ void MatrixPanel_I2S_DMA::setBrightnessOE(uint8_t brt, const int _buff_id)
 	// data changes probably aren't being sent out via DMA as they're sitting in a hadrware 'cache' 
     ESP32_I2S_DMA_STORAGE_TYPE *row_ptr = fb->rowBits[row_idx]->getDataPtr(0);
     // Cache_WriteBack_Addr((uint32_t)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false));
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     esp_cache_msync( (void*)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
+#else
+    Cache_WriteBack_Addr((uint32_t)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false));
+#endif
 #endif
   } while (row_idx);
 }
