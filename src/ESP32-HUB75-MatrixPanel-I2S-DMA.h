@@ -314,6 +314,9 @@ struct HUB75_I2S_CFG
   // If max_row > min_row, only rows in [min_row, max_row] are allocated full depth.
   uint8_t min_row;
   uint8_t max_row;
+  // [추가 2026-08-23] 행별 활성 마스크. 0 이 아니면 min_row/max_row 대신 이것을 쓴다.
+  // 비트 n 이 1 인 행만 full depth 로 할당한다 → 떨어진 여러 구간(로고/진행바)을 각각 지정할 수 있다.
+  uint32_t active_rows_mask = 0;
 
   // I2S clock speed
   clk_speed i2sspeed;

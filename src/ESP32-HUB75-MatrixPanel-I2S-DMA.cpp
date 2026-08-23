@@ -62,7 +62,11 @@ bool MatrixPanel_I2S_DMA::setupDMA(const HUB75_I2S_CFG &_cfg)
       bool is_dummy = false;
       
       // If ROI is specified, only use full color depth for rows within the ROI
-      if (m_cfg.max_row > m_cfg.min_row) {
+      if (m_cfg.active_rows_mask != 0) {
+        if (((m_cfg.active_rows_mask >> malloc_num) & 1u) == 0) {
+          is_dummy = true;
+        }
+      } else if (m_cfg.max_row > m_cfg.min_row) {
         if (malloc_num < m_cfg.min_row || malloc_num > m_cfg.max_row) {
            // [수정 2026-08-23] depth 를 1 로 줄이면 안 된다.
            //  descriptor 링크 루프는 모든 행에 대해 full depth 만큼 getDataPtr(i) 를 호출하는데(i=0..depth-1),
@@ -363,7 +367,9 @@ void IRAM_ATTR MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint16_t x_coord, uint
   if (!initialized)
     return;
 
-  if (m_cfg.max_row > m_cfg.min_row) {
+  if (m_cfg.active_rows_mask != 0) {
+    if (((m_cfg.active_rows_mask >> (y_coord % ROWS_PER_FRAME)) & 1u) == 0) return;
+  } else if (m_cfg.max_row > m_cfg.min_row) {
     if ((y_coord % ROWS_PER_FRAME) < m_cfg.min_row || (y_coord % ROWS_PER_FRAME) > m_cfg.max_row) {
       return;
     }
