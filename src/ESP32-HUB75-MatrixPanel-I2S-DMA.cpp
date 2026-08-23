@@ -54,19 +54,34 @@ bool MatrixPanel_I2S_DMA::setupDMA(const HUB75_I2S_CFG &_cfg)
   for (int fb = 0; fb < (fbs_required); fb++)
   {
     frame_buffer[fb].rowBits.reserve(ROWS_PER_FRAME);
+    std::shared_ptr<rowBitStruct> shared_dummy = nullptr;  // SHARED_DUMMY_ROW
 
     for (int malloc_num = 0; malloc_num < ROWS_PER_FRAME; malloc_num++)
     {
       int depth = m_cfg.getPixelColorDepthBits();
+      bool is_dummy = false;
       
       // If ROI is specified, only use full color depth for rows within the ROI
       if (m_cfg.max_row > m_cfg.min_row) {
         if (malloc_num < m_cfg.min_row || malloc_num > m_cfg.max_row) {
-           depth = 1; // Dummy row
+           // [수정 2026-08-23] depth 를 1 로 줄이면 안 된다.
+           //  descriptor 링크 루프는 모든 행에 대해 full depth 만큼 getDataPtr(i) 를 호출하는데(i=0..depth-1),
+           //  더미 버퍼가 width×1 뿐이면 할당 범위를 벗어난 주소를 DMA 에 넘겨 크래시한다.
+           //  (PSRAM 은 8MB 연속이라 읽히기만 했고, 내부 SRAM 에서는 바로 터졌다.)
+           //  크기는 full depth 로 두고 '버퍼 하나를 공유'하는 것으로 절감 효과를 얻는다.
+           is_dummy = true;
         }
       }
 
+      // SHARED_DUMMY_ROW: ROI 밖 행들은 버퍼 하나를 공유한다(OE 로 소등되므로 내용 무관)
+      if (is_dummy && shared_dummy != nullptr) {
+        frame_buffer[fb].rowBits.emplace_back(shared_dummy);
+        ++frame_buffer[fb].rows;
+        continue;
+      }
+
       auto ptr = std::make_shared<rowBitStruct>(PIXELS_PER_ROW, depth, m_cfg.sram_buffer);
+      if (is_dummy) shared_dummy = ptr;
 
       if (ptr->data == nullptr) {
 
@@ -433,7 +448,7 @@ void IRAM_ATTR MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint16_t x_coord, uint
 #if defined(SPIRAM_DMA_BUFFER)
     // Cache_WriteBack_Addr((uint32_t)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE));
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-    esp_cache_msync( (void*)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
+    if (!m_cfg.sram_buffer) esp_cache_msync( (void*)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
 #else
     Cache_WriteBack_Addr((uint32_t)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE));
 #endif
@@ -505,7 +520,7 @@ void MatrixPanel_I2S_DMA::updateMatrixDMABuffer(uint8_t red, uint8_t green, uint
 #if defined(SPIRAM_DMA_BUFFER)
         // Cache_WriteBack_Addr((uint32_t)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE));
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-        esp_cache_msync( (void*)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
+        if (!m_cfg.sram_buffer) esp_cache_msync( (void*)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
 #else
         Cache_WriteBack_Addr((uint32_t)&p[x_coord], sizeof(ESP32_I2S_DMA_STORAGE_TYPE));
 #endif
@@ -662,7 +677,7 @@ void MatrixPanel_I2S_DMA::clearFrameBuffer(bool _buff_id)
 #if defined(SPIRAM_DMA_BUFFER)
     // Cache_WriteBack_Addr((uint32_t)row, fb->rowBits[row_idx]->getColorDepthSize(false));
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-    esp_cache_msync( (void*)row, fb->rowBits[row_idx]->getColorDepthSize(false), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
+    if (!m_cfg.sram_buffer) esp_cache_msync( (void*)row, fb->rowBits[row_idx]->getColorDepthSize(false), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
 #else
     Cache_WriteBack_Addr((uint32_t)row, fb->rowBits[row_idx]->getColorDepthSize(false));
 #endif
@@ -736,7 +751,7 @@ void MatrixPanel_I2S_DMA::setBrightnessOE(uint8_t brt, const int _buff_id)
     ESP32_I2S_DMA_STORAGE_TYPE *row_ptr = fb->rowBits[row_idx]->getDataPtr(0);
     // Cache_WriteBack_Addr((uint32_t)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false));
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-    esp_cache_msync( (void*)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
+    if (!m_cfg.sram_buffer) esp_cache_msync( (void*)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false), ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_DATA | ESP_CACHE_MSYNC_FLAG_UNALIGNED );
 #else
     Cache_WriteBack_Addr((uint32_t)row_ptr, fb->rowBits[row_idx]->getColorDepthSize(false));
 #endif

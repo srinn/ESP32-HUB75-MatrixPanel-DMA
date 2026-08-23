@@ -3,6 +3,9 @@
 /***************************************************************************************/
 /* Core ESP32 hardware / idf includes!                                                 */
 #include <vector>
+
+extern volatile int g_hub75PsramFail;  // PSRAM 할당 실패 횟수(진단)
+extern volatile int g_hub75PsramOk;    // PSRAM 할당 성공 횟수
 #include <memory>
 #include <esp_err.h>
 #include <esp_log.h>
@@ -188,21 +191,21 @@ struct rowBitStruct
   {
 
     // #if defined(SPIRAM_FRAMEBUFFER) && defined (CONFIG_IDF_TARGET_ESP32S3)
-#if defined(SPIRAM_DMA_BUFFER)
+// [수정 2026-08-23] 빌드 플래그(SPIRAM_DMA_BUFFER)가 반영되지 않는 환경이 있어 조건부 컴파일을 걷어냈다.
+    // 이제 오직 mxconfig.sram_buffer 값으로 결정한다.
+    //   false = PSRAM(평시. 패널 확장 대비 - 내부 SRAM 을 비워 둔다)
+    //   true  = 내부 SRAM(OTA 중. flash 캐시가 꺼져도 DMA 가 읽을 수 있다)
     if (_sram_buffer) {
       data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_malloc(getColorDepthSize(false), MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
     } else {
-      // data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_aligned_alloc(64, size()+size()*double_buff, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-      // No longer have double buffer in the same struct - have a different struct
-      data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_aligned_alloc(64, getColorDepthSize(false), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT | MALLOC_CAP_DMA );
+      data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_aligned_alloc(64, getColorDepthSize(false), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+      if (data == nullptr) {   // PSRAM 실패 시에만 내부로 물러선다
+        g_hub75PsramFail++;
+        data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_malloc(getColorDepthSize(false), MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+      } else { g_hub75PsramOk++; }
+      static int _dbg = 0;
+      if (_dbg < 2) { _dbg++; Serial.printf("ROWBIT sram=%d psram_ok=%d\n", (int)_sram_buffer, (int)(data != nullptr)); }
     }
-#else
-    // data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_malloc( size()+size()*double_buff, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
-
-    // No longer have double buffer in the same struct - have a different struct
-    data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_malloc(getColorDepthSize(false), MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
-
-#endif
   }
   ~rowBitStruct() { delete data; }
 };
