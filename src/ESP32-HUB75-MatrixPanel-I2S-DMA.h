@@ -197,11 +197,13 @@ struct rowBitStruct
     //   true  = 내부 SRAM(OTA 중. flash 캐시가 꺼져도 DMA 가 읽을 수 있다)
     if (_sram_buffer) {
       data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_malloc(getColorDepthSize(false), MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+      if (data != nullptr) memset(data, 0, getColorDepthSize(false));   // [추가] 쓰레기값 제거
     } else {
       data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_aligned_alloc(64, getColorDepthSize(false), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
       if (data == nullptr) {   // PSRAM 실패 시에만 내부로 물러선다
         g_hub75PsramFail++;
         data = (ESP32_I2S_DMA_STORAGE_TYPE *)heap_caps_malloc(getColorDepthSize(false), MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA);
+      if (data != nullptr) memset(data, 0, getColorDepthSize(false));   // [추가] 쓰레기값 제거
       } else { g_hub75PsramOk++; }
       static int _dbg = 0;
       if (_dbg < 2) { _dbg++; Serial.printf("ROWBIT sram=%d psram_ok=%d\n", (int)_sram_buffer, (int)(data != nullptr)); }
@@ -735,6 +737,15 @@ public:
   /**
    * Stop the ESP32 DMA Engine. Screen will forever be black until next ESP reboot.
    */
+  // [추가 2026-08-23] 화면이 죽었을 때(lcd_start=0) 재부팅하지 않고 DMA 만 다시 돌린다.
+  //   dma_transfer_start() 안에서 gdma_start() + LCD_CAM.lcd_user.lcd_start = 1 을 한다.
+  void restartDMAoutput()
+  {
+    dma_bus.dma_transfer_stop();
+    delay(10);
+    dma_bus.dma_transfer_start();
+  }
+
   void stopDMAoutput()
   {
     resetbuffers();

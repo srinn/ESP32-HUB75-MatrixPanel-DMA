@@ -85,7 +85,9 @@ bool MatrixPanel_I2S_DMA::setupDMA(const HUB75_I2S_CFG &_cfg)
       }
 
       auto ptr = std::make_shared<rowBitStruct>(PIXELS_PER_ROW, depth, m_cfg.sram_buffer);
-      if (is_dummy) shared_dummy = ptr;
+      if (is_dummy) {
+        shared_dummy = ptr;
+      }
 
       if (ptr->data == nullptr) {
 
@@ -558,7 +560,6 @@ void MatrixPanel_I2S_DMA::clearFrameBuffer(bool _buff_id)
   do
   {
     --row_idx;
-
     ESP32_I2S_DMA_STORAGE_TYPE *row = fb->rowBits[row_idx]->getDataPtr(0); // set pointer to the HEAD of a buffer holding data for the entire matrix row
     ESP32_I2S_DMA_STORAGE_TYPE abcde = (ESP32_I2S_DMA_STORAGE_TYPE)row_idx;
 
